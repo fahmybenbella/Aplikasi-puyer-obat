@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puyer Pro v5.0 - Klinik Spesialis Anak</title>
+    <style>
+        :root { --primary: #007AFF; --danger: #FF3B30; --bg: #F2F2F7; --secondary: #5856D6; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 15px; margin: 0; color: #1C1C1E; }
+        .container { max-width: 650px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { text-align: center; color: #8E8E93; font-size: 13px; margin-bottom: 25px; }
+        
+        .header-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        label { display: block; font-size: 11px; font-weight: 700; color: #8E8E93; text-transform: uppercase; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #C6C6C8; border-radius: 10px; box-sizing: border-box; font-size: 16px; -webkit-appearance: none; }
+
+        .drug-row { background: #F8F9FA; border: 1px solid #E5E5EA; padding: 15px; border-radius: 12px; margin-bottom: 12px; position: relative; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .drug-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+        .btn-remove { position: absolute; top: -8px; right: -8px; background: var(--danger); color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+        .actions { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-add { flex: 1; background: var(--secondary); color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 600; cursor: pointer; }
+        .btn-calc { flex: 2; background: var(--primary); color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 700; font-size: 17px; cursor: pointer; }
+
+        .result-card { display: none; background: #FFF; border-top: 8px solid var(--primary); padding: 20px; border-radius: 16px; margin-top: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { text-align: left; font-size: 11px; color: #8E8E93; border-bottom: 1px solid #EEE; padding-bottom: 8px; }
+        td { padding: 12px 0; border-bottom: 1px solid #F2F2F7; font-size: 14px; }
+        .final-val { font-weight: 800; color: var(--primary); font-size: 16px; text-align: right; }
+        .mg-val { color: #666; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>Puyer Pro v5.0</h2>
+        <div class="subtitle">Sistem Informasi Racikan Obat Anak</div>
+        
+        <div class="header-grid">
+            <div>
+                <label>Nama Pasien</label>
+                <input type="text" id="namaPasien" placeholder="Nama Lengkap">
+            </div>
+            <div>
+                <label>BB (kg)</label>
+                <input type="number" id="bb" placeholder="0" step="0.1">
+            </div>
+            <div>
+                <label>Jml Puyer</label>
+                <input type="number" id="jmlBungkus" placeholder="0">
+            </div>
+        </div>
+
+        <hr style="border: 0.5px solid #F2F2F7; margin: 20px 0;">
+        
+        <label>Komposisi Racikan Obat</label>
+        <div id="drugList"></div>
+
+        <div class="actions">
+            <button class="btn-add" onclick="addDrugRow()">+ Tambah Obat</button>
+            <button class="btn-calc" onclick="hitungSemua()">HITUNG RACIKAN</button>
+        </div>
+    </div>
+
+    <div id="resultCard" class="result-card">
+        <h3 style="margin-top:0; color:#1C1C1E;">Ringkasan Resep:</h3>
+        <p id="resHeader" style="background:#EBF5FB; padding:10px; border-radius:8px; font-weight:600;"></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>NAMA OBAT</th>
+                    <th>DOSIS/BKS</th>
+                    <th style="text-align: right;">AMBIL TABLET</th>
+                </tr>
+            </thead>
+            <tbody id="resBody"></tbody>
+        </table>
+        <div style="margin-top:20px; padding:10px; background:#FEF7E0; border-radius:8px; font-size:12px; color:#B78103;">
+            ⚠️ <b>Peringatan:</b> Selalu verifikasi perhitungan secara manual. Perhatikan Beyond Use Date (BUD) racikan puyer.
+        </div>
+    </div>
+</div>
+
+<script>
+    // Database Obat v5.0 (Ditambahkan Batuk, Pilek, dan Antibiotik)
+    const dbObat = [
+        // ANALGESIK & ANTIPIRETIK
+        { cat: "Demam", nama: "Paracetamol", sediaan: 500, dosisKg: 10 },
+        { cat: "Demam", nama: "Ibuprofen", sediaan: 200, dosisKg: 5 },
+        
+        // BATUK & PILEK (Flu)
+        { cat: "Flu", nama: "CTM (Chlorpheniramine)", sediaan: 4, dosisKg: 0.1 },
+        { cat: "Flu", nama: "Pseudoephedrine", sediaan: 30, dosisKg: 1 },
+        { cat: "Flu", nama: "GG (Glyceryl Guaiacolate)", sediaan: 100, dosisKg: 5 },
+        { cat: "Flu", nama: "Ambroxol", sediaan: 30, dosisKg: 0.5 },
+        { cat: "Flu", nama: "Salbutamol", sediaan: 2, dosisKg: 0.05 },
+        { cat: "Flu", nama: "Dextromethorphan", sediaan: 15, dosisKg: 0.2 },
+        
+        // ANTIBIOTIK (Dosis umum per hari dibagi 3)
+        { cat: "Antibiotik", nama: "Amoxicillin", sediaan: 500, dosisKg: 15 },
+        { cat: "Antibiotik", nama: "Cefadroxil", sediaan: 500, dosisKg: 15 },
+        { cat: "Antibiotik", nama: "Erythromycin", sediaan: 250, dosisKg: 10 },
+        
+        // KORTIKOSTEROID
+        { cat: "Radang", nama: "Dexamethasone", sediaan: 0.5, dosisKg: 0.015 },
+        { cat: "Radang", nama: "Methylprednisolone", sediaan: 4, dosisKg: 0.125 },
+        
+        { cat: "Lainnya", nama: "Custom / Manual", sediaan: 0, dosisKg: 0 }
+    ];
+
+    function addDrugRow() {
+        const container = document.getElementById('drugList');
+        const rowId = Date.now();
+        const div = document.createElement('div');
+        div.className = 'drug-row';
+        div.id = 'row-' + rowId;
+        
+        let options = dbObat.map((o, index) => 
+            `<option value="${index}">${o.cat}: ${o.nama} (${o.sediaan}mg)</option>`
+        ).join('');
+
+        div.innerHTML = `
+            <button class="btn-remove" onclick="removeRow(${rowId})">×</button>
+            <div class="drug-grid">
+                <div>
+                    <label>Nama Obat</label>
+                    <select class="drug-select" onchange="autoFill(${rowId}, this.value)">
+                        <option value="">-- Pilih Obat --</option>
+                        ${options}
+                    </select>
+                </div>
+                <div>
+                    <label>Dosis mg/kg</label>
+                    <input type="number" class="dosis-val" id="dosis-${rowId}" step="0.001">
+                </div>
+                <div>
+                    <label>Sediaan (mg)</label>
+                    <input type="number" class="stok-val" id="stok-${rowId}">
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    function removeRow(id) {
+        document.getElementById('row-' + id).remove();
+    }
+
+    function autoFill(rowId, dbIndex) {
+        if(dbIndex === "") return;
+        const data = dbObat[dbIndex];
+        document.getElementById('dosis-' + rowId).value = data.dosisKg;
+        document.getElementById('stok-' + rowId).value = data.sediaan;
+    }
+
+    function hitungSemua() {
+        const bb = parseFloat(document.getElementById('bb').value);
+        const bungkus = parseFloat(document.getElementById('jmlBungkus').value);
+        const namaPasien = document.getElementById('namaPasien').value || "PASIEN ANONIM";
+        const rows = document.getElementsByClassName('drug-row');
+
+        if (!bb || !bungkus || rows.length === 0) {
+            alert("Lengkapi data Berat Badan, Jumlah Bungkus, dan Obat!");
+            return;
+        }
+
+        let htmlResults = "";
+        
+        for (let row of rows) {
+            const id = row.id.replace('row-', '');
+            const selectEl = row.querySelector('.drug-select');
+            const textObat = selectEl.options[selectEl.selectedIndex].text;
+            const namaObat = textObat.includes(':') ? textObat.split(': ')[1].split(' (')[0] : "Obat Custom";
+            
+            const dosisKg = parseFloat(document.getElementById('dosis-' + id).value);
+            const stok = parseFloat(document.getElementById('stok-' + id).value);
+
+            if (dosisKg && stok) {
+                const dosisPerBks = bb * dosisKg;
+                const totalTablet = (dosisPerBks * bungkus) / stok;
+
+                htmlResults += `
+                    <tr>
+                        <td><b>${namaObat}</b></td>
+                        <td class="mg-val">${dosisPerBks.toFixed(2)} mg</td>
+                        <td class="final-val">${totalTablet.toFixed(2)} Tab</td>
+                    </tr>
+                `;
+            }
+        }
+
+        document.getElementById('resHeader').innerText = `👤 ${namaPasien.toUpperCase()} | ⚖️ ${bb}kg | 📦 ${bungkus} Bungkus`;
+        document.getElementById('resBody').innerHTML = htmlResults;
+        document.getElementById('resultCard').style.display = 'block';
+        
+        // Scroll otomatis ke hasil
+        document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Tambah baris pertama saat load
+    addDrugRow();
+</script>
+
+</body>
+</html>
